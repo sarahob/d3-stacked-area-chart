@@ -5,6 +5,7 @@
     .y-axis, .x-axis, line, path{
         fill: none;
         stroke: none;
+        
     }
 
     .area {
@@ -83,9 +84,10 @@
         xAxis2 = d3.axisBottom(x2),
         yAxis = d3.axisLeft(y);
 
+    let circleData = [];
+
     d3.json("data.json", function (error, res) {
         if (error) throw error;
-        console.log(res);
         let data = res.data;
 
         const keys = d3.keys(data[0]).slice(1);
@@ -105,7 +107,6 @@
         const minDate = new Date(res.range.min);
         const maxDate = new Date(res.range.max);
 
-        console.log(minDate, maxDate);
 
         x.domain([minDate, maxDate]);
         z.domain(keys);
@@ -120,15 +121,11 @@
              .attr("class", "layer");
 
         focus.append("path")
-              .attr("class", "area")
+                .attr("class", 'area')
+               .attr('key', d => d.key)
                .style("fill", function (d) { return z(d.key); })
                .attr("d", area)
-               .on('mouseover', function(){
-                    d3.select(this).style('opacity', 0.8);
-                })
-                .on('mouseout', function(){
-                    d3.select(this).style('opacity', 1);
-                });
+               .each(drawPoints);
 
             focus.append("g")
                 .attr("class", "x-axis")
@@ -168,6 +165,79 @@
                 .call(zoom);
 
         });
+
+        function drawPoints(d, index){
+            const data = d;
+            
+            d3.select(this.parentNode).selectAll('circle')
+            .data(d)
+            .enter()
+            .append('circle')
+            .attr('class', (d, i) => {
+                let id = i;
+                if(index === 1){
+                    // second loop
+                    const size = d3.selectAll('circle').size() / 2 ;
+                    id = id + size;
+                }
+                return `circle-${id}`;
+            })
+            .attr('r', 10)
+            .attr('fill', 'yellow')
+            .attr('opacity', 0)
+            .attr('cx', (d, i)=>{
+                const xCoord =  (x(d.data.time));
+                circleData.push([xCoord]);
+                return xCoord;
+            })
+            .attr('cy', (d, i)=>{
+                const yCoord = y(d[1]);
+                let pos = i;
+                if(index === 1){
+                    // second loop
+                    const size = d3.selectAll('circle').size() / 2 ;
+                    pos = pos + size;
+                }
+                circleData[pos].push(yCoord);
+                return yCoord;
+            });
+
+            // after we draw circles apply voronoi
+            if(index === 1 && circleData){
+
+                let voronoi = d3.voronoi()
+                    .extent([[-1, -1], [width + 1, height + 1]]);
+                
+                let polygon = d3.select('g.focus').append("g")
+                    .attr("class", 'polygons')
+                    .selectAll("path")
+                    .data(voronoi.polygons(circleData))
+                    .enter()
+                    .append("path")
+                    .attr("class", (d, i) =>{
+                        return `polygon-${i}`;
+                    })
+                    .attr('stroke', 'red')
+                    .style("pointer-events", "all")
+                    .call(redrawPolygon);
+
+                    polygon.on('mouseover', function(d, i){
+                        const sel = `circle.circle-${i}`;
+                        d3.select(sel).attr('opacity', 1);
+                    })
+                    .on('mouseout', function(d, i){
+                        const sel = `circle.circle-${i}`;
+                        d3.select(sel).attr('opacity', 0);
+                    });
+                
+            }
+        }
+
+        function redrawPolygon(polygon) {
+            polygon
+                .attr("d", function(d) { return d ? "M" + d.join("L") + "Z" : null; });
+        }
+
 
         function brushed() {
         if (d3.event.sourceEvent && d3.event.sourceEvent.type === "zoom") return; // ignore brush-by-zoom
