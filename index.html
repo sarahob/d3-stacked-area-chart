@@ -93,8 +93,8 @@
         const keys = d3.keys(data[0]).slice(1);
 
         // mutate data to append time in correct format
-        data = data.map(d => {
-            return { ...d, time: new Date(d.t) };
+        data = data.map((d, i) => {
+            return { ...d, time: new Date(d.t), id: i };
         }).sort((a, b) => {
             return (a.time > b.time) ? 1 : -1;
         });
@@ -118,7 +118,7 @@
         focus = focus.selectAll(".layer")
               .data(stack(data))
              .enter().append("g")
-             .attr("class", "layer");
+             .attr("class", 'layer');
 
         focus.append("path")
                 .attr("class", 'area')
@@ -126,6 +126,47 @@
                .style("fill", function (d) { return z(d.key); })
                .attr("d", area)
                .each(drawPoints);
+
+            console.log(stack(data));
+
+            let voronoi = d3.voronoi()
+                    .x(function (d) { console.log(d); return x(d.data.time); })
+                    .y(function (d) { return y(d[1]); })
+                    .extent([[-1, -1], [width + 1, height + 1]]);
+
+//* FIX SELECTION HERE *//                
+            let polygon = svg.append("g")
+                    .selectAll("g")
+                    .attr("class", 'polygons')
+                    .data(stack(data))
+                    .enter()
+                    .selectAll("path")
+                    .data(function(d, i){
+                        console.log('datum', d);
+                        return voronoi.polygons(d);
+                    })
+                    .enter()
+                    .append('path')
+                    .attr('stroke', 'red')
+                    .attr("class", (d, i) =>{
+                        return `polygon-${i}`;
+                    })
+                    .style("pointer-events", "all")
+                    .call(redrawPolygon);
+
+                    polygon.on('mouseover', function(d, i){
+                        console.log('d', d);
+                        const sel = `circle.circle-${i}`;
+                        d3.select(sel).attr('opacity', 1);
+ 
+                        
+                    })
+                    .on('mouseout', function(d, i){
+                        const sel = `circle.circle-${i}`;
+                        d3.select(sel).attr('opacity', 0);
+
+                    });
+
 
             focus.append("g")
                 .attr("class", "x-axis")
@@ -176,14 +217,19 @@
             .attr('class', (d, i) => {
                 let id = i;
                 if(index === 1){
-                    // second loop
+                    // second loop, better way to handle this?? 
                     const size = d3.selectAll('circle').size() / 2 ;
                     id = id + size;
                 }
                 return `circle-${id}`;
             })
-            .attr('r', 10)
-            .attr('fill', 'yellow')
+            .attr('r', 8)
+            .attr('fill', '#fff')
+            .attr('stroke-width', '5px')
+            .attr('stroke', d => {
+                const key = d3.select(this).attr('key'); // get the key from the path 
+                return z(key);
+            })
             .attr('opacity', 0)
             .attr('cx', (d, i)=>{
                 const xCoord =  (x(d.data.time));
@@ -194,43 +240,14 @@
                 const yCoord = y(d[1]);
                 let pos = i;
                 if(index === 1){
-                    // second loop
+                    // second loop, better way to handle this? 
                     const size = d3.selectAll('circle').size() / 2 ;
                     pos = pos + size;
                 }
+                // build up an array of circle data to use with the voronoi 
                 circleData[pos].push(yCoord);
                 return yCoord;
             });
-
-            // after we draw circles apply voronoi
-            if(index === 1 && circleData){
-
-                let voronoi = d3.voronoi()
-                    .extent([[-1, -1], [width + 1, height + 1]]);
-                
-                let polygon = d3.select('g.focus').append("g")
-                    .attr("class", 'polygons')
-                    .selectAll("path")
-                    .data(voronoi.polygons(circleData))
-                    .enter()
-                    .append("path")
-                    .attr("class", (d, i) =>{
-                        return `polygon-${i}`;
-                    })
-                    .attr('stroke', 'red')
-                    .style("pointer-events", "all")
-                    .call(redrawPolygon);
-
-                    polygon.on('mouseover', function(d, i){
-                        const sel = `circle.circle-${i}`;
-                        d3.select(sel).attr('opacity', 1);
-                    })
-                    .on('mouseout', function(d, i){
-                        const sel = `circle.circle-${i}`;
-                        d3.select(sel).attr('opacity', 0);
-                    });
-                
-            }
         }
 
         function redrawPolygon(polygon) {
