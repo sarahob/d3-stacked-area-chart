@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+    .y-axis, .x-axis, line, path{
+        fill: none;
+        stroke: none;
+    }
+
+    .area {
+        clip-path: url(#clip);
+    }
+
+    .zoom {
+        cursor: move;
+        fill: none;
+    }
+
+
+</style>
+<div class="container">
+    <svg width="1355" height="530"></svg>
+</div>
+<script src="//d3js.org/d3.v4.min.js"></script>
+<script>
+
+    let svg = d3.select("svg"),
+        focusHeight = 500,
+        margin = { top: 20, right: 20, bottom: 130, left: 50 },
+        margin2 = {top: 430, right: 20, bottom: 30, left: 40},
+        width = svg.attr("width") - margin.left - margin.right,
+        height = focusHeight - margin.top - margin.bottom
+        height2 = +svg.attr("height") - margin2.top - margin2.bottom;
+
+    const parseDate = d3.timeFormat('%H:%M:%S');
+
+    let x = d3.scaleTime().range([0, width]),
+        x2 = d3.scaleTime().range([0, width]),
+        y = d3.scaleLinear().range([height, 0]),
+        y2 = d3.scaleLinear().range([height2, 0]),
+        z = d3.scaleOrdinal(['rgb(203, 30, 144)','rgb(0, 133, 195)']);
+
+    let stack = d3.stack();
+
+    let area = d3.area()
+        .x(function (d, i) { return x(d.data.time); })
+        .y0(function (d) { return y(d[0]); })
+        .y1(function (d) { return y(d[1]); });
+
+    let area2 = d3.area()
+        .x(function (d, i) { return x2(d.data.time); })
+        .y0(function (d) { return y2(d[0]); })
+        .y1(function (d) { return y2(d[1]); });
+
+    svg.append("defs").append("clipPath")
+        .attr("id", "clip")
+    .append("rect")
+        .attr("width", width)
+        .attr("height", height);
+
+    let brush = d3.brushX()
+        .extent([[0, 0], [width, height2]])
+        .on("brush end", brushed);
+
+    let zoom = d3.zoom()
+        .scaleExtent([1, Infinity])
+        .translateExtent([[0, 0], [width, height]])
+        .extent([[0, 0], [width, height]])
+        .on("zoom", zoomed);
+
+    let focus = svg.append("g")
+        .attr("class", "focus")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    let context = svg.append("g")
+        .attr("class", "context")
+        .attr("transform", "translate(" + margin2.left + "," + margin2.top + ")");
+
+    let g = svg.append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    let xAxis = d3.axisBottom(x),
+        xAxis2 = d3.axisBottom(x2),
+        yAxis = d3.axisLeft(y);
+
+    d3.json("data.json", function (error, res) {
+        if (error) throw error;
+        console.log(res);
+        let data = res.data;
+
+        const keys = d3.keys(data[0]).slice(1);
+
+        // mutate data to append time in correct format
+        data = data.map(d => {
+            return { ...d, time: new Date(d.t) };
+        }).sort((a, b) => {
+            return (a.time > b.time) ? 1 : -1;
+        });
+
+        const maxVal = Math.floor(d3.max(data, (d) => {
+                const vals = keys.map((k) => {return d[k];});
+                return d3.sum(vals);
+            }));
+
+        const minDate = new Date(res.range.min);
+        const maxDate = new Date(res.range.max);
+
+        console.log(minDate, maxDate);
+
+        x.domain([minDate, maxDate]);
+        z.domain(keys);
+        y.domain([0, maxVal]);
+        x2.domain(x.domain());
+        y2.domain(y.domain());
+        stack.keys(keys).order(d3.stackOrderReverse);
+
+        focus = focus.selectAll(".layer")
+              .data(stack(data))
+             .enter().append("g")
+             .attr("class", "layer");
+
+        focus.append("path")
+              .attr("class", "area")
+               .style("fill", function (d) { return z(d.key); })
+               .attr("d", area)
+               .on('mouseover', function(){
+                    d3.select(this).style('opacity', 0.8);
+                })
+                .on('mouseout', function(){
+                    d3.select(this).style('opacity', 1);
+                });
+
+            focus.append("g")
+                .attr("class", "x-axis")
+                .attr("transform", "translate(0," + height + ")")
+                .call(xAxis);
+
+            focus.append("g")
+                .attr("class", "y-axis")
+                .call(yAxis);
+
+
+            context = context.selectAll(".layer")
+              .data(stack(data))
+             .enter().append("g")
+             .attr("class", "layer");
+
+            context.append("path")
+              .attr("class", "area")
+               .style("fill", function (d) { return z(d.key); })
+                .attr("d", area2);
+
+            context.append("g")
+                .attr("class", "x-axis")
+                .attr("transform", "translate(0," + height2 + ")")
+                .call(xAxis2);
+
+            context.append("g")
+                .attr("class", "brush")
+                .call(brush)
+                .call(brush.move, x.range());
+
+            svg.append("rect")
+                .attr("class", "zoom")
+                .attr("width", width)
+                .attr("height", height)
+                .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+                .call(zoom);
+
+        });
+
+        function brushed() {
+        if (d3.event.sourceEvent && d3.event.sourceEvent.type === "zoom") return; // ignore brush-by-zoom
+            var s = d3.event.selection || x2.range();
+            x.domain(s.map(x2.invert, x2));
+            focus.select(".area").attr("d", area);
+            focus.select(".x-axis").call(xAxis);
+            svg.select(".zoom").call(zoom.transform, d3.zoomIdentity
+                .scale(width / (s[1] - s[0]))
+                .translate(-s[0], 0));
+        }
+
+        function zoomed() {
+        if (d3.event.sourceEvent && d3.event.sourceEvent.type === "brush") return; // ignore zoom-by-brush
+            var t = d3.event.transform;
+            x.domain(t.rescaleX(x2).domain());
+            focus.select(".area").attr("d", area);
+            focus.select(".x-axis").call(xAxis);
+            context.select(".brush").call(brush.move, x.range().map(t.invertX, t));
+        }
+
+</script>
