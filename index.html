@@ -87,11 +87,13 @@
 
     // voronoi layout
     let voronoi = d3.voronoi()
-        .x(function (d) { return d.x; })
-        .y(function (d) { return d.y })
+        .x(function (d) { return x(d.x); })
+        .y(function (d) { return y(d.y); })
         .extent([[-1, -1], [width + 1, height + 1]]);
 
     const dispatch = d3.dispatch('mousedOver', 'mousedOut');
+
+    let pointData = null;
 
     d3.json("data.json", function (error, res) {
         if (error) throw error;
@@ -136,16 +138,8 @@
             .style("fill", function (d) { return z(d.key); })
             .attr("d", area);
 
-        // create data for circles and voronoi
-        const temp = [];
-        stack(data).forEach(d => {
-            const points = d.map(p => {
-                return { x: x(p.data.time), y: y(p[1]), key: d.key };
-            });
-            temp.push(points);
-        });
 
-        const pointData = _.flatten(temp); // data for circles and voronoi
+        pointData = generatePointData(stack(data)); // data for circles and voronoi
 
         // circles  
         let circleGroup = focus.append('g')
@@ -165,32 +159,10 @@
                 return z(d.key);
             })
             .attr('opacity', 0)
-            .attr('cx', (d) => {
-                return d.x;
-            })
-            .attr('cy', (d) => {
-                return d.y;
-            });
+            .call(positionCircles);
 
 
-        let polygonGroup = svg.append("g")
-            .attr("class", 'polygons');
-
-        polygonGroup.selectAll('path')
-            .data(voronoi.polygons(pointData))
-            .enter()
-            .append('path')
-            .attr('stroke', 'red')
-            .attr("class", (d, i) => {
-                return `polygon-${i}`;
-            })
-            .attr('key', (d) => {
-                return d ? d.data.key : '';
-            })
-            .style("pointer-events", "all")
-            .call(redrawPolygon)
-            .on('mouseover', mouseover)
-            .on('mouseout', mouseout);
+        drawVoronoi();
 
         focus = areaLayer;
 
@@ -237,14 +209,63 @@
             .call(zoom);
 
         // custom mouseover events for layer paths to highlight when voronoi is interacted with
-        dispatch.on('mousedOver', function(sel){
+        dispatch.on('mousedOver', function (sel) {
             d3.select(`#${sel}`).attr('opacity', 0.7);
         });
 
-        dispatch.on('mousedOut', function(sel){
+        dispatch.on('mousedOut', function (sel) {
             d3.select(`#${sel}`).attr('opacity', 1);
         });
     });
+
+    function generatePointData(stackData) {
+        // create data for circles and voronoi
+        const temp = [];
+        stackData.forEach(d => {
+            const points = d.map(p => {
+                return { x: p.data.time, y: p[1], key: d.key };
+            });
+            temp.push(points);
+        });
+
+        return _.flatten(temp); // data for circles and voronoi
+    }
+
+    function positionCircles(circle) {
+        circle
+            .attr('cx', (d) => {
+                return x(d.x);
+            })
+            .attr('cy', (d) => {
+                return y(d.y);
+            });
+    }
+
+    function drawVoronoi(sel) {
+
+        d3.select('g.polygons').remove(); // remove
+
+        // redraw
+        let polygonGroup = svg.append("g")
+            .attr("class", 'polygons');
+
+        polygonGroup.selectAll('path')
+            .data(voronoi.polygons(pointData))
+            .enter()
+            .append('path')
+            .attr('stroke', 'red')
+            .attr("class", (d, i) => {
+                return `polygon-${i}`;
+            })
+            .attr('key', (d) => {
+                return d ? d.data.key : '';
+            })
+            .style("pointer-events", "all")
+            .call(redrawPolygon)
+            .on('mouseover', mouseover)
+            .on('mouseout', mouseout);
+
+    }
 
     function mouseover() {
         dispatch.call('mousedOver', this, d3.select(this).attr('key'));
@@ -280,6 +301,8 @@
         x.domain(s.map(x2.invert, x2));
         focus.select(".area").attr("d", area);
         focus.select(".x-axis").call(xAxis);
+        d3.select('.circles').selectAll('circle').call(positionCircles);
+        drawVoronoi();
         svg.select(".zoom").call(zoom.transform, d3.zoomIdentity
             .scale(width / (s[1] - s[0]))
             .translate(-s[0], 0));
@@ -291,6 +314,8 @@
         x.domain(t.rescaleX(x2).domain());
         focus.select(".area").attr("d", area);
         focus.select(".x-axis").call(xAxis);
+        d3.select('.circles').selectAll('circle').call(positionCircles);
+        drawVoronoi();
         context.select(".brush").call(brush.move, x.range().map(t.invertX, t));
     }
 
