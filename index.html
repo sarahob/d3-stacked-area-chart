@@ -1,13 +1,16 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
 <style>
-    .y-axis,
-    .x-axis,
-    line,
-    path {
+    .x-axis line,
+    .x-axis>path {
         fill: none;
         stroke: none;
+    }
 
+    .y-axis line,
+    .y-axis>path {
+        fill: none;
+        stroke: none;
     }
 
     .area {
@@ -24,6 +27,7 @@
 </div>
 <script src="//d3js.org/d3.v4.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.11/lodash.js"></script>
+<script src="./d3-tooltip/index.js"></script>
 <script>
 
     let svg = d3.select("svg"),
@@ -40,7 +44,7 @@
         x2 = d3.scaleTime().range([0, width]),
         y = d3.scaleLinear().range([height, 0]),
         y2 = d3.scaleLinear().range([height2, 0]),
-        z = d3.scaleOrdinal(['rgb(203, 30, 144)', 'rgb(0, 133, 195)']);
+        z = d3.scaleOrdinal(['#F24092','#007DB8']);
 
     let stack = d3.stack();
 
@@ -95,9 +99,15 @@
 
     let pointData = null;
 
+    tip = d3.tip().attr('class', 'd3-tip').html(function(d) { return d; });
+
+    /* Invoke the tip in the context of your visualization */
+    vis.call(tip)
+
     d3.json("data.json", function (error, res) {
         if (error) throw error;
         let data = res.data;
+        const threshold = res.percentile95;
 
         const keys = d3.keys(data[0]).slice(1);
 
@@ -135,6 +145,7 @@
         areaLayer.append("path")
             .attr("class", 'area')
             .attr('id', d => d.key)
+            .style('opacity', 0.8)
             .style("fill", function (d) { return z(d.key); })
             .attr("d", area);
 
@@ -150,6 +161,7 @@
             .enter()
             .append('circle')
             .attr('class', (d, i) => {
+                console.log(d);
                 return `circle-${i}`;
             })
             .attr('r', 8)
@@ -200,6 +212,17 @@
             .call(brush)
             .call(brush.move, x.range());
 
+        // threshold line
+        focus.append('path')
+            .attr('class', 'threshold')
+            .datum(threshold)
+            .attr('stroke-width', '1px')
+            .attr('stroke', '#7AB800')
+            .attr('d', d => {
+                const yPos = Math.floor(y(d));
+                return `M0,${yPos}, L${width},${yPos}Z`;
+            });
+
         // zoom rect
         svg.append("rect")
             .attr("class", "zoom")
@@ -222,9 +245,12 @@
         // create data for circles and voronoi
         const temp = [];
         stackData.forEach(d => {
-            const points = d.map(p => {
-                return { x: p.data.time, y: p[1], key: d.key };
-            });
+            const points = d.filter(p => { // filter out data that has 0 value 
+                return p.data[d.key] > 0;
+            })
+                .map(f => {
+                    return { x: f.data.time, y: f[1], key: d.key };
+                });
             temp.push(points);
         });
 
@@ -253,7 +279,8 @@
             .data(voronoi.polygons(pointData))
             .enter()
             .append('path')
-            .attr('stroke', 'red')
+            .attr('fill', 'none')
+            .attr('stroke', 'none')
             .attr("class", (d, i) => {
                 return `polygon-${i}`;
             })
