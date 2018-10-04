@@ -1,0 +1,38 @@
+.tooltip-wrapper{
+    position:absolute;
+    visibility: hidden;
+  }
+  
+  .tooltip-container{
+    width: 80px;
+    height: 50px;
+    position: relative;
+  }
+  
+  .tooltip{
+    font-size: 12px;
+    font-family: sans-serif;
+    line-height: 1;
+    height:100%;
+    padding: 6px;
+    background: #fff;
+    color: #000;
+    box-shadow: #ccc 1px 1px 1px 1px;
+    font-size: 12px;
+  }
+  
+  .tooltip:after {
+    box-sizing: border-box;
+    display: inline;
+    font-size: 18px;
+    line-height: 1;
+    color: #fff;
+    content: "\25BC";
+    position: absolute;
+    text-align: center;
+    margin: -2px 0 0 0;
+    text-shadow: 2px 2px #ccc;
+    top: 120%;
+    left: 30px;
+  }
+  
