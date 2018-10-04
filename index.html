@@ -21,27 +21,37 @@
 <script src="//d3js.org/d3.v4.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.11/lodash.js"></script>
 <script src="chart-tooltip.js"></script>
-<script src="stacked-area.js"></script>
+<script src="stacked-area-chart.js"></script>
 <script>
+
+    let chart;
 
     d3.json("data/data-3.json", function (error, res) {
         if (error) throw error;
 
         const config = {
-        tooltip: {
-            map: {
-            r: 'Read',
-            w: 'Write'
-            },
-            label: `val1 val2 IOPS`
-        },
-        threshold: `95th Percentile val IOPS`,
         layerColors: ['#F24092', '#007DB8'],
         selector: '.container',
-        data: res
+        data: res.data,
+        threshold: res.percentile95,
+        range: res.range,
+        layout: {
+            height: 352,
+            focusMargin: { top: 20, right: 20, bottom: 30, left: 50 },
+            contextMargin: { top: 408, right: 20, bottom: 30, left: 40 }
+        },
+        tooltipLabel: function(key, val){
+            const map = {'r': 'Read', 'w': 'Write'};
+            return `${map[key]} ${val} IOPS`;
+        },
+        thresholdLabel: function(val){
+            return `95th Percentile ${val} IOPS`;
+        }
         };
 
-        drawChart(config);
+        // drawChart(config);
+        chart = new StackedAreaChart(config);
+        chart.draw();
 
     });
 
@@ -56,6 +66,11 @@
         tooltip.hide();
       }
     }
+
+    window.addEventListener('resize', ()=> {
+        const debounce = _.debounce(chart.resize.bind(chart.chartInstance), 250);
+        debounce();
+    });
 
 
 
