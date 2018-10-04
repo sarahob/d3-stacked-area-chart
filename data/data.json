@@ -1,5 +1,5 @@
  {
-     "type": "Stacked",
+     "type": "ipos",
      "range": {
          "min":"2018-09-19T12:23:00Z",
          "max":"2018-09-19T12:33:00Z"
