@@ -313,6 +313,10 @@ class StackedAreaChart {
       .datum(threshold)
       .attr('stroke-width', '1px')
       .attr('stroke', '#7AB800')
+      .attr('d', d => {
+        const yPos = Math.floor(this.yScaleFocus(d));
+        return `M0,${yPos}, L0,${yPos}Z`;
+      })
       .call(this.drawThresholdLine.bind(this));
 
     focus
