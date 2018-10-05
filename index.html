@@ -37,6 +37,7 @@
         range: res.range,
         layout: {
             height: 352,
+            maxWidth: 1350,
             focusMargin: { top: 20, right: 20, bottom: 30, left: 50 },
             contextMargin: { top: 408, right: 20, bottom: 30, left: 40 }
         },
@@ -49,7 +50,6 @@
         }
         };
 
-        // drawChart(config);
         chart = new StackedAreaChart(config);
         chart.draw();
 
