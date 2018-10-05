@@ -571,6 +571,8 @@ class StackedAreaChart {
   zoomed() {
     if (d3.event.sourceEvent && d3.event.sourceEvent.type === 'brush') return; // ignore zoom-by-brush
     var t = d3.event.transform;
+    // check t has valid props
+    // if (_.values(t).every(d => Number.isInteger(d))) {
     this.xScaleFocus.domain(t.rescaleX(this.xScaleContext).domain());
     d3.select('.focus')
       .selectAll('.layer')
@@ -587,6 +589,48 @@ class StackedAreaChart {
     d3.select('.context')
       .select('.brush')
       .call(this.brush.move, this.xScaleFocus.range().map(t.invertX, t));
+    this.drawBrushShadowOverlay(this.xScaleFocus.range().map(t.invertX, t));
+    //}
+  }
+
+  /**
+   * Draw brush shadow overlay so selection is transparent and area not selected
+   * has overlay. This is the inverse of the default experience.
+   * @param {*} selectionArray
+   */
+  drawBrushShadowOverlay(selectionArray) {
+    if (d3.select('.overlay-shadow.left').empty()) {
+      d3.select('.context')
+        .select('.brush')
+        .append('rect')
+        .attr('class', 'overlay-shadow left')
+        .attr('height', this.contextHeight)
+        .attr('width', selectionArray[0])
+        .attr('fill', '#777')
+        .attr('opacity', '0.3');
+    } else {
+      d3.select('.overlay-shadow.left').attr('width', selectionArray[0]);
+    }
+
+    if (d3.select('.overlay-shadow.right').empty()) {
+      d3.select('.context')
+        .select('.brush')
+        .append('rect')
+        .attr('class', 'overlay-shadow right')
+        .attr('height', this.contextHeight)
+        .attr('width', () => {
+          return Math.floor(this.width - selectionArray[1]);
+        })
+        .attr('x', Math.floor(selectionArray[1]))
+        .attr('fill', '#777')
+        .attr('opacity', '0.3');
+    } else {
+      d3.select('.overlay-shadow.right')
+        .attr('width', () => {
+          return Math.floor(this.width - selectionArray[1]);
+        })
+        .attr('x', Math.floor(selectionArray[1]));
+    }
   }
 
   resize() {

@@ -20,18 +20,6 @@ body {
   position: relative;
 }
 
-.x-axis line,
-.x-axis > path {
-  /* fill: none;
-  stroke: none; */
-}
-
-.y-axis line,
-.y-axis > path {
-  /* fill: none;
-  stroke: none; */
-}
-
 .area {
   clip-path: url(#clip);
 }
@@ -49,4 +37,8 @@ body {
 .threshold-label{
   font-family: sans-serif;
   font-size: 12px;
+}
+
+.selection{
+  fill: none;
 }
