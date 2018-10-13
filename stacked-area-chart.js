@@ -17,6 +17,8 @@ class StackedAreaChart {
     this.yScaleContext = d3.scaleLinear();
     this.colorScale = d3.scaleOrdinal();
 
+    this.brushSelection = [];
+
     this.stack = d3.stack();
 
     this.areaFocus = d3
@@ -265,7 +267,8 @@ class StackedAreaChart {
       .attr('d', this.areaContext);
 
     // brush
-    let gBrush = context
+    let gBrush = d3
+      .select('.context')
       .append('g')
       .attr('class', 'brush')
       .call(this.brush);
@@ -279,7 +282,10 @@ class StackedAreaChart {
 
     this.handle
       .append('path')
-      .attr('class', 'handle-custom')
+      .attr('class', d => {
+        const pos = d.type === 'w' ? 'left' : 'right';
+        return `'handle-custom ${pos}`;
+      })
       .attr('fill', '#7AB800')
       .attr('stroke', '#7AB800')
       .style('cursor', 'pointer')
@@ -292,17 +298,20 @@ class StackedAreaChart {
 
     this.handle
       .append('text')
-      .attr('class', 'custom-handle-text')
+      .attr('class', d => {
+        const pos = d.type === 'e' ? 'txt-right' : 'txt-left';
+        return `custom-handle-text ${pos}`;
+      })
       .attr('fill', '#fff')
       .style('font-size', '11px')
       .style('cursor', 'pointer')
       .attr('dx', d => {
         if (d.type === 'e') {
-          return -30;
+          return -38;
         }
-        return 16;
+        return 11;
       })
-      .attr('dy', -8);
+      .attr('dy', -7);
 
     gBrush.call(this.brush.move, this.xScaleContext.range());
 
@@ -359,6 +368,7 @@ class StackedAreaChart {
       .attr('stroke', '#E4E4E4')
       .attr('stroke-width', '1px')
       .style('opacity', 0.8)
+      .attr('x1', 0)
       .attr('x2', this.width);
     g.selectAll('.tick text')
       .attr('x', -14)
@@ -371,7 +381,7 @@ class StackedAreaChart {
     g.select('.domain')
       .attr('stroke', '#E4E4E4')
       .attr('stroke-width', '1px')
-      .style('opacity', 0.8)
+      .style('opacity', 0)
       .attr('d', () => {
         return `M0,0 L${this.width} 0`;
       });
@@ -513,16 +523,19 @@ class StackedAreaChart {
     // toggle opacity
     d3.select(sel).attr('opacity', val);
 
-    // wrap event dispatch in debounce
-    const debounced = _.debounce(() => {
-      var event = new CustomEvent('toggleTooltip', {
-        detail: { show: val, xPos: cx, yPos: cy, label: label }
-      });
+    // only show tooltip for circles within bounds
+    if (cx < this.width && cx > 0) {
+      // wrap event dispatch in debounce
+      const debounced = _.debounce(() => {
+        var event = new CustomEvent('toggleTooltip', {
+          detail: { id: id, show: val, xPos: cx, yPos: cy, label: label }
+        });
 
-      document.querySelector('div.container').dispatchEvent(event);
-    }, 150);
+        document.querySelector('div.container').dispatchEvent(event);
+      }, 150);
 
-    debounced();
+      debounced();
+    }
   }
 
   /**
@@ -540,13 +553,10 @@ class StackedAreaChart {
    * @param {*} line
    */
   drawThresholdLine(line) {
-    line
-      .transition()
-      .duration(1000)
-      .attr('d', d => {
-        const yPos = Math.floor(this.yScaleFocus(d));
-        return `M0,${yPos}, L${this.width},${yPos}Z`;
-      });
+    line.transition().attr('d', d => {
+      const yPos = Math.floor(this.yScaleFocus(d));
+      return `M0,${yPos}, L${this.width},${yPos}Z`;
+    });
   }
 
   /**
@@ -554,17 +564,71 @@ class StackedAreaChart {
    */
   brushed() {
     const s = d3.event.selection || this.xScaleContext.range();
+    const sx = s.map(this.xScaleContext.invert);
+
     if (s == null) {
       this.handle.attr('display', 'none');
+    } else if (sx[0].toString() === sx[1].toString()) {
+      return;
     } else {
-      const sx = s.map(this.xScaleContext.invert);
       this.handle.selectAll('text').text(d => {
         const val = d.type === 'w' ? sx[0] : sx[1];
         return this.parseDate(val);
       });
-      this.handle.attr('transform', function(d, i) {
-        return 'translate(' + s[i] + ',' + 0 + ')';
-      });
+
+      this.handle
+        .attr('transform', function(d, i) {
+          return 'translate(' + s[i] + ',' + 0 + ')';
+        })
+        .each((d, i) => {
+          if (d.type === 'w') {
+            if (s[i] > 46) {
+              this.handle
+                .select('.left')
+                .transition()
+                .attr('d', 'M 0,-21 L-46,-21 L-46,0 L-2,0 L0,74');
+
+              this.handle
+                .select('.txt-left')
+                .transition()
+                .attr('dx', '-36');
+            } else {
+              this.handle
+                .select('.left')
+                .transition()
+                .attr('d', 'M 0,-21 L46,-21 L46,0 L2,0 L0,74');
+
+              this.handle
+                .select('.txt-left')
+                .transition()
+                .attr('dx', '11');
+            }
+          }
+
+          if (d.type === 'e') {
+            if (s[i] < this.width - 46) {
+              this.handle
+                .select('.right')
+                .transition()
+                .attr('d', 'M 0,-21 L 46,-21 L46,0 L2,0 L0,74');
+
+              this.handle
+                .select('.txt-right')
+                .transition()
+                .attr('dx', '11');
+            } else {
+              this.handle
+                .select('.right')
+                .transition()
+                .attr('d', 'M 0,-21 L -46,-21 L-46,0 L-2,0 L0,74');
+
+              this.handle
+                .select('.txt-right')
+                .transition()
+                .attr('dx', '-36');
+            }
+          }
+        });
     }
 
     // zoom
@@ -596,8 +660,7 @@ class StackedAreaChart {
   zoomed() {
     if (d3.event.sourceEvent && d3.event.sourceEvent.type === 'brush') return; // ignore zoom-by-brush
     var t = d3.event.transform;
-    // check t has valid props
-    // if (_.values(t).every(d => Number.isInteger(d))) {
+
     this.xScaleFocus.domain(t.rescaleX(this.xScaleContext).domain());
     d3.select('.focus')
       .selectAll('.layer')
@@ -611,11 +674,13 @@ class StackedAreaChart {
       .selectAll('circle')
       .call(this.positionCircles.bind(this));
     this.drawVoronoi(this.pointData);
+
+    this.brushSelection = this.xScaleFocus.range().map(t.invertX, t);
+
     d3.select('.context')
       .select('.brush')
-      .call(this.brush.move, this.xScaleFocus.range().map(t.invertX, t));
-    this.drawBrushShadowOverlay(this.xScaleFocus.range().map(t.invertX, t));
-    //}
+      .call(this.brush.move, this.brushSelection);
+    this.drawBrushShadowOverlay(this.brushSelection);
   }
 
   /**
@@ -631,10 +696,13 @@ class StackedAreaChart {
         .attr('class', 'overlay-shadow left')
         .attr('height', this.contextHeight)
         .attr('width', selectionArray[0])
+        .attr('pointer-events', 'none')
         .attr('fill', '#777')
         .attr('opacity', '0.3');
     } else {
-      d3.select('.overlay-shadow.left').attr('width', selectionArray[0]);
+      if (selectionArray) {
+        d3.select('.overlay-shadow.left').attr('width', selectionArray[0]);
+      }
     }
 
     if (d3.select('.overlay-shadow.right').empty()) {
@@ -642,6 +710,7 @@ class StackedAreaChart {
         .select('.brush')
         .append('rect')
         .attr('class', 'overlay-shadow right')
+        .attr('pointer-events', 'none')
         .attr('height', this.contextHeight)
         .attr('width', () => {
           return Math.floor(this.width - selectionArray[1]);
@@ -650,11 +719,20 @@ class StackedAreaChart {
         .attr('fill', '#777')
         .attr('opacity', '0.3');
     } else {
-      d3.select('.overlay-shadow.right')
-        .attr('width', () => {
-          return Math.floor(this.width - selectionArray[1]);
-        })
-        .attr('x', Math.floor(selectionArray[1]));
+      if (selectionArray) {
+        d3.select('.overlay-shadow.right')
+          .attr('width', () => {
+            const width = Math.floor(this.width - selectionArray[1]);
+            return width > 0 ? width : 0;
+          })
+          .attr('x', Math.floor(selectionArray[1]));
+      } else {
+        const x = d3.select('.overlay-shadow.right').attr('x');
+        d3.select('.overlay-shadow.right').attr('width', () => {
+          const width = Math.floor(this.width - x);
+          return width > 0 ? width : 0;
+        });
+      }
     }
   }
 
@@ -662,55 +740,36 @@ class StackedAreaChart {
     const wrapper = d3.select('div.wrapper');
     const resizeWidth = parseInt(wrapper.style('width'));
 
-    console.log('resize', resizeWidth);
-
-    if (
-      resizeWidth < this.width ||
-      (resizeWidth > this.width && this.width < this.config.layout.maxWidth)
-    ) {
+    if (resizeWidth < this.width || resizeWidth > this.width) {
       const wrapperWidth =
         resizeWidth < this.config.layout.maxWidth
           ? resizeWidth
           : this.config.layout.maxWidth;
+
       this.width =
         wrapperWidth - this.focusMargin.left - this.focusMargin.right;
-      console.log(this.width);
+
       this.xScaleFocus.range([0, this.width]);
       this.xScaleContext.range([0, this.width]);
 
-      d3.select('svg')
-        .transition()
-        .duration(1000)
-        .attr('width', wrapperWidth);
+      d3.select('svg').attr('width', wrapperWidth);
 
-      d3.select('.focus')
-        .transition()
-        .attr(
-          'transform',
-          'translate(' +
-            this.focusMargin.left +
-            ',' +
-            this.focusMargin.top +
-            ')'
-        );
+      d3.select('.focus').attr(
+        'transform',
+        'translate(' + this.focusMargin.left + ',' + this.focusMargin.top + ')'
+      );
 
       d3.select('.focus')
         .selectAll('.layer')
         .select('.area')
-        .transition()
-        .duration(1000)
         .attr('d', this.areaFocus);
 
       d3.select('.focus')
         .select('.x-axis')
-        .transition()
-        .duration(1000)
         .call(this.customXAxisFocus.bind(this));
 
       d3.select('.focus')
         .select('.y-axis')
-        .transition()
-        .duration(1000)
         .call(this.customYAxis.bind(this));
 
       d3.select('.focus')
@@ -720,32 +779,40 @@ class StackedAreaChart {
 
       d3.select('.context')
         .select('.background-context')
-        .transition()
-        .duration(1000)
         .attr('width', this.width);
 
       d3.select('.context')
         .selectAll('.layer')
         .select('.area')
-        .transition()
-        .duration(1000)
         .attr('d', this.areaContext);
 
       d3.select('.context')
         .select('.x-axis')
-        .transition()
-        .duration(1000)
         .call(this.customXAxisContext.bind(this));
 
+      this.brush.extent([[0, 0], [this.width, this.contextHeight]]);
+
       d3.select('.context')
+        .select('g.brush')
         .call(this.brush)
         .call(this.brush.move, this.xScaleContext.range());
+
+      if (this.brushSelection[1] > this.width) {
+        this.brushSelection[1] = this.width;
+      }
+
+      this.drawBrushShadowOverlay(this.brushSelection);
 
       d3.select('.circles')
         .selectAll('circle')
         .call(this.positionCircles.bind(this));
 
       this.drawVoronoi(this.pointData);
+
+      d3.select('svg')
+        .select('#clip')
+        .select('rect')
+        .attr('width', this.width);
     }
   }
 }

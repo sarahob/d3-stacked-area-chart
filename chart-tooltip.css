@@ -4,21 +4,22 @@
   }
   
   .tooltip-container{
-    width: 80px;
-    height: 50px;
+    width: 100%;
+    height: 35px;
     position: relative;
   }
   
   .tooltip{
     font-size: 12px;
     font-family: sans-serif;
-    line-height: 1;
-    height:100%;
+    line-height: 3;
+    height: 100%;
     padding: 6px;
     background: #fff;
     color: #000;
     box-shadow: #ccc 1px 1px 1px 1px;
     font-size: 12px;
+    
   }
   
   .tooltip:after {
@@ -32,7 +33,7 @@
     text-align: center;
     margin: -2px 0 0 0;
     text-shadow: 2px 2px #ccc;
-    top: 120%;
-    left: 30px;
+    top: 125%;
+    left: 40%;
   }
   

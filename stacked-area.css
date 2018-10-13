@@ -42,3 +42,11 @@ body {
 .selection{
   fill: none;
 }
+
+.overlay{
+  cursor: default;
+}
+
+.selection{
+  cursor: default;
+}
